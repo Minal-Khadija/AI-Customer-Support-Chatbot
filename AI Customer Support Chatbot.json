@@ -1,0 +1,192 @@
+{
+  "name": "AI Customer Support Chatbot",
+  "nodes": [
+    {
+      "parameters": {
+        "jsCode": "const data = $input.first().json;\n\n// 🛑 Stop if message is from a bot (prevents infinite loop)\nif (data.event?.bot_id || data.bot_id || data.event?.subtype === 'bot_message') {\n  return [];\n}\n\n// Get message from Slack\nconst message = (data.event?.text || data.text || '').toLowerCase();\nconst userName = data.event?.user || 'Customer';\n\n// Find keyword in message\nlet keyword = 'unknown';\nif (message.includes('price') || message.includes('cost') || message.includes('package')) {\n  keyword = 'price';\n} else if (message.includes('hour') || message.includes('timing') || message.includes('time')) {\n  keyword = 'hours';\n} else if (message.includes('refund') || message.includes('return') || message.includes('money back')) {\n  keyword = 'refund';\n} else if (message.includes('contact') || message.includes('email') || message.includes('phone')) {\n  keyword = 'contact';\n} else if (message.includes('order') || message.includes('track')) {\n  keyword = 'order';\n} else if (message.includes('support') || message.includes('help')) {\n  keyword = 'support';\n}\n\nreturn [{\n  json: {\n    original_message: data.event?.text || data.text,\n    user_name: userName,\n    channel: data.event?.channel || data.channel,\n    keyword: keyword,\n    timestamp: new Date().toISOString()\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -96,
+        0
+      ],
+      "id": "ea09d1e2-4331-4e28-97bc-3cff5434bbbf",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT answer, category \nFROM faq \nWHERE keyword = '{{ $json.keyword }}'\nLIMIT 1;",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        128,
+        0
+      ],
+      "id": "4fafd3b2-a7c9-4b77-baa3-b3eea8b64f41",
+      "name": "Execute a SQL query",
+      "credentials": {
+        "postgres": {
+          "id": "S7Siq0g8NhltUvOo",
+          "name": "Postgres account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "f70dae5b-6481-406e-9821-9332c5c01f2d",
+              "leftValue": "={{ $json.answer }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        320,
+        0
+      ],
+      "id": "3a9dab69-dc18-4c6b-ae48-08b1d4520a16",
+      "name": "If"
+    },
+    {
+      "parameters": {
+        "trigger": [
+          "message"
+        ],
+        "channelId": {
+          "__rl": true,
+          "value": "C0AU6FADNL9",
+          "mode": "list",
+          "cachedResultName": "minalk"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.slackTrigger",
+      "typeVersion": 1,
+      "position": [
+        -304,
+        0
+      ],
+      "id": "21fd15c4-04ef-4ffb-bbd1-14cf4b9a126f",
+      "name": "Slack Trigger",
+      "webhookId": "0ce9437e-e098-4e87-9865-4ac45f207808",
+      "credentials": {
+        "slackApi": {
+          "id": "MxxfJmFDMnRfXtUh",
+          "name": "Slack account 3"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "value": "C0AU6FADNL9",
+          "mode": "list",
+          "cachedResultName": "minalk"
+        },
+        "text": "={{ $json.answer }}",
+        "otherOptions": {}
+      },
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.4,
+      "position": [
+        528,
+        -96
+      ],
+      "id": "58e7b5e7-0f7d-470b-89e7-876f6d2b12fa",
+      "name": "Send a message",
+      "webhookId": "c1e77ebb-5285-4fca-8dfb-d522c79167a4",
+      "credentials": {
+        "slackApi": {
+          "id": "WEDI9lfAEGxHdo2u",
+          "name": "Slack OAuth2 API"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "Execute a SQL query",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Execute a SQL query": {
+      "main": [
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If": {
+      "main": [
+        [
+          {
+            "node": "Send a message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Slack Trigger": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "timeSavedMode": "fixed",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  },
+  "versionId": "d25bf66d-8f5e-45d4-938b-ed1b70c5815a",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "fbc00d114bbd1def22ade720b498f533e608d11288af8ee44a6bbc5d1988e16e"
+  },
+  "id": "GBrn7zQwazwXec3k",
+  "tags": []
+}
